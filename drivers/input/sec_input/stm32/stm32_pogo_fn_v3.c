@@ -24,7 +24,7 @@ void stm32_print_info(struct stm32_dev *stm32)
 			stm32->mdata.phone_ver[3], stm32->mdata.ic_ver[3],
 			(stm32->keyboard_model == STM32_KEYBOARD_ROW_DATA_MODEL) ?
 			stm32->dtdata->model_name_row[stm32->ic_fw_ver.model_id] :
-			stm32->dtdata->model_name[stm32->ic_fw_ver.model_id],
+			stm32->dtdata->model_name[stm32->model_name_id],
 			stm32->ic_fw_ver.fw_major_ver, stm32->ic_fw_ver.fw_minor_ver, stm32->ic_fw_ver.model_id,
 			stm32->ic_fw_ver.hw_rev);
 	input_info(true, &stm32->client->dev, "TC_v%02X%02X.%X, con:%d/%d, int:%d, depth:%d, rst:%d, hall:%d model_id:0x%x\n",
@@ -119,18 +119,35 @@ int stm32_read_version(struct stm32_dev *stm32)
 
 	if (rbuf[1] == 0 || rbuf[1] == 1 || rbuf[1] == 2) {
 		if (stm32->keyboard_model == 0xd1 || stm32->keyboard_model == 0xd2)
-			stm32->ic_fw_ver.model_id = 2;
-		else if (stm32->keyboard_model == 0xd3 || stm32->keyboard_model == 0xd4 || stm32->keyboard_model == 0xd5)
-			stm32->ic_fw_ver.model_id = 3;
+			stm32->model_name_id = 2;
+		else if (stm32->keyboard_model == 0x03 || stm32->keyboard_model == 0xd3 || stm32->keyboard_model == 0xd5)
+			stm32->model_name_id = 3;
 		else if (stm32->keyboard_model == 0xd6)
-			stm32->ic_fw_ver.model_id = 4;
+			stm32->model_name_id = 4;
 		else
-			stm32->ic_fw_ver.model_id = rbuf[1];
-	} else
+			stm32->model_name_id = rbuf[1];
+
+		stm32->ic_fw_ver.model_id = rbuf[1];
+	} else {
+		stm32->model_name_id = 0;
 		stm32->ic_fw_ver.model_id = 0;
+	}
+
 	stm32->ic_fw_ver.fw_minor_ver = rbuf[2];
 	stm32->ic_fw_ver.fw_major_ver = rbuf[3];
 	boot_module_id = stm32->ic_fw_ver.model_id;
+
+	/* 0xFE is the Tab S8 Ultra Keyboard (EF-DX900). */
+	/* If it is anything else, force the S9 firmware path. */
+	if (stm32->keyboard_model != 0xFE) {
+		stm32->dtdata->mcu_fw_name = "keyboard_stm/stm32_gts9family.bin";
+		input_info(true, &stm32->client->dev, "%s: S9 Keyboard detected. Swapping fw to %s\n", 
+			__func__, stm32->dtdata->mcu_fw_name);
+	} else {
+		/* Reset back to S8 default just in case of hot-swapping */
+		stm32->dtdata->mcu_fw_name = "keyboard_stm/stm32_gts8u.bin";
+	}
+	/* ------------------------------------- */
 
 	input_info(true, &stm32->client->dev, "%s: [IC] version:%d.%d, model_id:%02d, hw_rev:%02d\n",
 			__func__, stm32->ic_fw_ver.fw_major_ver, stm32->ic_fw_ver.fw_minor_ver,
