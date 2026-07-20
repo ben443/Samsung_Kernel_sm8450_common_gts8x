@@ -1,0 +1,179 @@
+name: Build Kernel and Modules
+
+on:
+  workflow_dispatch:
+    inputs:
+      defconfig:
+        description: "Kernel defconfig target (e.g. gki_defconfig)"
+        required: false
+        default: "gki_defconfig"
+      extra_make_args:
+        description: "Extra make args (optional)"
+        required: false
+        default: ""
+
+jobs:
+  build:
+    name: Build kernel + modules
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+
+    env:
+      ARCH: arm64
+      SUBARCH: arm64
+      OUT_DIR: out
+      LLVM: "1"
+      LLVM_IAS: "1"
+      CC: clang
+      CLANG_TRIPLE: aarch64-linux-gnu-
+      CROSS_COMPILE: aarch64-linux-gnu-
+      CROSS_COMPILE_COMPAT: arm-linux-gnueabi-
+      KCFLAGS: -Wno-error
+      # Cap parallel jobs to prevent memory exhaustion
+      MAKEFLAGS: -j2 
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install base dependencies
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            bc bison build-essential ccache curl dwarves flex git kmod \
+            libelf-dev libncurses-dev libssl-dev lz4 pahole python3 rsync \
+            xz-utils zstd zip
+
+      - name: Setup Proton-Clang Toolchain
+        run: |
+          set -euxo pipefail
+          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git $HOME/proton-clang
+          # Inject the toolchain into the runner's PATH for all subsequent steps
+          echo "$HOME/proton-clang/bin" >> $GITHUB_PATH
+
+      - name: Configure swap space
+        run: |
+          set -euxo pipefail
+          # Provision additional swap on the runner's ephemeral SSD
+          sudo fallocate -l 12G /mnt/extra-swap
+          sudo chmod 600 /mnt/extra-swap
+          sudo mkswap /mnt/extra-swap
+          sudo swapon /mnt/extra-swap
+          
+          free -h
+          swapon --show
+
+      - name: Print tool versions
+        run: |
+          set -euxo pipefail
+          uname -a
+          clang --version || true
+          ld.lld --version || true
+          aarch64-linux-gnu-gcc --version || true
+          arm-linux-gnueabi-gcc --version || true
+          make --version
+
+      - name: Resolve defconfig
+        id: cfg
+        run: |
+          set -euxo pipefail
+          DEFCONFIG="${{ github.event.inputs.defconfig }}"
+          if [ -z "${DEFCONFIG}" ]; then
+            DEFCONFIG="gki_defconfig"
+          fi
+          echo "defconfig=${DEFCONFIG}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure kernel
+        run: |
+          set -euxo pipefail
+          mkdir -p "${OUT_DIR}"
+          make ARCH=${ARCH} O=${OUT_DIR} "${{ steps.cfg.outputs.defconfig }}"
+          make ARCH=${ARCH} O=${OUT_DIR} olddefconfig
+          cp "${OUT_DIR}/.config" "${OUT_DIR}/config.final"
+
+      - name: Build kernel image and modules
+        run: |
+          set -euxo pipefail
+          EXTRA_ARGS="${{ github.event.inputs.extra_make_args }}"
+          make ARCH=${ARCH} O=${OUT_DIR} \
+            LLVM=${LLVM} LLVM_IAS=${LLVM_IAS} \
+            CC=${CC} CLANG_TRIPLE=${CLANG_TRIPLE} \
+            CROSS_COMPILE=${CROSS_COMPILE} CROSS_COMPILE_COMPAT=${CROSS_COMPILE_COMPAT} \
+            KCFLAGS="${KCFLAGS}" \
+            ${EXTRA_ARGS} \
+            Image modules dtbs
+
+      - name: Install modules to staging
+        run: |
+          set -euxo pipefail
+          rm -rf module_staging
+          mkdir -p module_staging
+          make ARCH=${ARCH} O=${OUT_DIR} \
+            LLVM=${LLVM} LLVM_IAS=${LLVM_IAS} \
+            CC=${CC} CLANG_TRIPLE=${CLANG_TRIPLE} \
+            CROSS_COMPILE=${CROSS_COMPILE} CROSS_COMPILE_COMPAT=${CROSS_COMPILE_COMPAT} \
+            INSTALL_MOD_STRIP=1 \
+            modules_install INSTALL_MOD_PATH="${PWD}/module_staging"
+            
+          # CRITICAL: Remove the build/source symlinks so the artifact 
+          # uploader doesn't package the entire kernel source tree.
+          rm -f module_staging/lib/modules/*/build
+          rm -f module_staging/lib/modules/*/source
+
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -rf artifacts
+          mkdir -p artifacts/kernel artifacts/modules artifacts/meta
+
+          cp -v "${OUT_DIR}/arch/arm64/boot/Image" artifacts/kernel/ || true
+          cp -v "${OUT_DIR}/arch/arm64/boot/Image.gz" artifacts/kernel/ || true
+          cp -v "${OUT_DIR}/arch/arm64/boot/Image.gz-dtb" artifacts/kernel/ || true
+
+          shopt -s globstar nullglob
+          
+          # OPTIMIZATION: Only collect Qualcomm (qcom) DTBs
+          DTBS=( ${OUT_DIR}/arch/arm64/boot/dts/qcom/**/*.dtb )
+          DTBOS=( ${OUT_DIR}/arch/arm64/boot/dts/qcom/**/*.dtbo )
+
+          if (( ${#DTBS[@]} > 0 )); then
+            mkdir -p artifacts/kernel/dtb
+            cp -v "${DTBS[@]}" artifacts/kernel/dtb/
+          fi
+          if (( ${#DTBOS[@]} > 0 )); then
+            mkdir -p artifacts/kernel/dtbo
+            cp -v "${DTBOS[@]}" artifacts/kernel/dtbo/
+          fi
+
+          rsync -a module_staging/ artifacts/modules/
+          cp -v "${OUT_DIR}/Module.symvers" artifacts/meta/ || true
+          cp -v "${OUT_DIR}/System.map" artifacts/meta/ || true
+          cp -v "${OUT_DIR}/vmlinux" artifacts/meta/ || true
+          cp -v "${OUT_DIR}/config.final" artifacts/meta/.config || true
+
+          {
+            echo "Repo: $GITHUB_REPOSITORY"
+            echo "SHA: $GITHUB_SHA"
+            echo "Ref: $GITHUB_REF"
+            echo "Defconfig: ${{ steps.cfg.outputs.defconfig }}"
+            echo "Build time (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > artifacts/meta/build-manifest.txt
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-build-${{ github.run_number }}-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: error
+          compression-level: 6
+
+      - name: Upload raw output dir (debug fallback)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-build-debug-out-${{ github.run_number }}-${{ github.sha }}
+          path: out/
+          if-no-files-found: warn
+          compression-level: 0
