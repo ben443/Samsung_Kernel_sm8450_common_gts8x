@@ -2,6 +2,14 @@ name: Build Kernel
 on:
   workflow_dispatch:
     inputs:
+      device:
+        description: 'Build target device'
+        required: true
+        type: choice
+        default: 'gts8uwifi'
+        options:
+          - gts8uwifi
+          - gts8wifi
       root_solution:
         description: 'Choose Root Method'
         required: true
@@ -98,6 +106,8 @@ jobs:
       - name: Run build
         env:
           CI_KERNEL_NAME: "${{ env.SHORT_BRANCH }}_workflow_kernel-build"
+          CI_BUILD_TARGET: "${{ inputs.device }}_eur_open"
+          CI_KERNEL_DEFCONFIG: "${{ inputs.device }}-waipio_defconfig"
         run: ./build.sh
 
       - name: Upload kernel zip

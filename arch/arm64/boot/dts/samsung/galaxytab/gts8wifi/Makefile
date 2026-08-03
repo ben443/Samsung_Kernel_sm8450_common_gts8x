@@ -33,5 +33,4 @@ gts8wifi_eur_open_w00_r04.dtbo-base := ../../../vendor/qcom/waipio.dtb ../../../
 #    $(SEC_GTS8P_DTBO),$(CONFIG_ARCH_WAIPIO),$(SEC_WAIPIO_BASE_DTB)))
 #endif
 
-clean-files := *.dtb *.reverse.dts *.dtb
-o
+clean-files := *.dtb *.reverse.dts *.dtbo

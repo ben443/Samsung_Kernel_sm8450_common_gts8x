@@ -2,6 +2,15 @@ name: Build Kernel
 
 on:
   workflow_dispatch:
+    inputs:
+      device:
+        description: "Kernel device target"
+        required: true
+        type: choice
+        default: "gts8uwifi"
+        options:
+          - gts8uwifi
+          - gts8wifi
 
 jobs:
   Build-Kernel:
@@ -18,7 +27,7 @@ jobs:
           kernel-url: https://github.com/ben443Samsung_Kernel_sm8450_common_gts8x
           #kernel-dir: msm-4.19
           kernel-branch: msm-kernel_nethunter
-          config: gts8uwifi-waipio_defconfig
+          config: ${{ inputs.device }}-waipio_defconfig
           arch: arm64
           aosp-gcc: true
           aosp-clang: true

@@ -30,7 +30,8 @@ echo  # Blank line
 
 # ---------------------------------------------------------------------------------------------------------------- #
 # ---------------------------| EXPORTS and Directory Setup |------------------------------------------------------ #
-KERNEL_DEFCONFIG=gts8uwifi-waipio_defconfig  # Looks for defconfig in arch/<exported_arch>/configs/
+BUILD_TARGET=gts8uwifi_eur_open
+KERNEL_DEFCONFIG=${BUILD_TARGET%%_*}-waipio_defconfig  # Looks for defconfig in arch/<exported_arch>/configs/
 ANYKERNEL3_DIR=$PWD/AnyKernel3/ # Required by the function zip_kernel
 AK3_REPO="https://github.com/akm-04/AnyKernel3.git"
 AK3_BRANCH="gts8u"
@@ -235,7 +236,7 @@ setup_env(){
 
     # Required by techpack
     #1. target config
-    BUILD_TARGET=gts8uwifi_eur_open
+    BUILD_TARGET="${CI_BUILD_TARGET:-${BUILD_TARGET}}"
     export MODEL=$(echo ${BUILD_TARGET} | cut -d'_' -f1)
     export PROJECT_NAME=${MODEL}
     export REGION=$(echo ${BUILD_TARGET} | cut -d'_' -f2)
@@ -1210,6 +1211,7 @@ CI_Setup() {
     #
     # --- STRING CONFIGURATIONS (Expects: Text strings, paths, or commit SHAs) ---
     #   CI_KERNEL_NAME              (e.g., "gts8u_Workflow_Kernel")
+    #   CI_BUILD_TARGET             (e.g., "gts8wifi_eur_open")
     #   CI_KERNEL_DEFCONFIG         (e.g., "gts8uwifi_waipio_defconfig")
     #   CI_MODULES_NAME             (e.g., "Kernel_Modules-Magisk")
     #   CI_ARTIFACT                 (e.g., "Image.gz")
@@ -1236,7 +1238,8 @@ CI_Setup() {
 
     # Base Setup & Naming Overrides (Fallback to script defaults)
     FINAL_KERNEL_ZIP="${CI_KERNEL_NAME:-""}"
-    KERNEL_DEFCONFIG="${CI_KERNEL_DEFCONFIG:-$KERNEL_DEFCONFIG}"
+    BUILD_TARGET="${CI_BUILD_TARGET:-$BUILD_TARGET}"
+    KERNEL_DEFCONFIG="${CI_KERNEL_DEFCONFIG:-${BUILD_TARGET%%_*}-waipio_defconfig}"
 
     AK3_REPO="${CI_AK3_REPO:-$AK3_REPO}"
     AK3_BRANCH="${CI_AK3_BRANCH:-$AK3_BRANCH}"
