@@ -34,6 +34,10 @@ This repository contains multiple branches of a Samsung SM8450-based kernel for 
 
 3. Build the kernel by running the build script, final TWRP flashable kernel zip should be produced inside the AnyKernel3 directory.
 
+Device targets:
+- `gts8uwifi` (SM-X900 series): `gts8uwifi-waipio_defconfig`
+- `gts8wifi` (SM-X700): `gts8wifi-waipio_defconfig`
+
 # How do I submit patches to Android Common Kernels
 
 1. BEST: Make all of your changes to upstream Linux. If appropriate, backport to the stable releases.
@@ -183,4 +187,3 @@ a maintainer tree)
 - If the patch is a new feature
     - tag the patch subject with `ANDROID:`
     - add a `Bug:` tag with the Android bug (required for android-specific features)
-
