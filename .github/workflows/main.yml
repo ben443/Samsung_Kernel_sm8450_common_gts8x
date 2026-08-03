@@ -134,9 +134,9 @@ jobs:
 
           shopt -s globstar nullglob
           
-          # OPTIMIZATION: Only collect Qualcomm (qcom) DTBs
-          DTBS=( ${OUT_DIR}/arch/arm64/boot/dts/qcom/**/*.dtb )
-          DTBOS=( ${OUT_DIR}/arch/arm64/boot/dts/qcom/**/*.dtbo )
+          # Collect Qualcomm and Samsung DTBs/DTBOs
+          DTBS=( ${OUT_DIR}/arch/arm64/boot/dts/qcom/**/*.dtb ${OUT_DIR}/arch/arm64/boot/dts/samsung/**/*.dtb )
+          DTBOS=( ${OUT_DIR}/arch/arm64/boot/dts/qcom/**/*.dtbo ${OUT_DIR}/arch/arm64/boot/dts/samsung/**/*.dtbo )
 
           if (( ${#DTBS[@]} > 0 )); then
             mkdir -p artifacts/kernel/dtb
