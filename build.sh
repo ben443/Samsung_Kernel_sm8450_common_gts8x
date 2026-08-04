@@ -81,6 +81,21 @@ build_kernel() {
   make "${MAKE_FLAGS[@]}" -j"$(nproc)" ${EXTRA_KMAKE_TARGETS}
 }
 
+build_dtbo_image() {
+  local dtb_root="${OUT_DIR}/arch/arm64/boot/dts"
+  local dtbo_path="${OUT_DIR}/arch/arm64/boot/dtbo.img"
+  local -a dtbo_files=()
+
+  while IFS= read -r -d '' dtbo_file; do
+    dtbo_files+=("${dtbo_file}")
+  done < <(find "${dtb_root}" -type f -name "${BUILD_TARGET}_*.dtbo" -print0)
+
+  [ ${#dtbo_files[@]} -gt 0 ] || return 0
+
+  command -v mkdtboimg.py >/dev/null
+  mkdtboimg.py create "${dtbo_path}" --page_size=4096 "${dtbo_files[@]}"
+}
+
 package_anykernel() {
   local image_path="${OUT_DIR}/arch/arm64/boot/Image"
   local dtbo_path="${OUT_DIR}/arch/arm64/boot/dtbo.img"
@@ -118,6 +133,7 @@ main() {
   setup_toolchain
   prepare_anykernel
   build_kernel
+  build_dtbo_image
   package_anykernel
 
   local elapsed=$(( $(date +%s) - BUILD_START ))
