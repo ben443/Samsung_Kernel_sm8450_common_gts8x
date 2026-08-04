@@ -24,9 +24,9 @@ jobs:
       - name: Build Kernel
         uses: dabao1955/kernel_build_action@main
         with:
-          kernel-url: https://github.com/ben443Samsung_Kernel_sm8450_common_gts8x
+          kernel-url: https://github.com/ben443/Samsung_Kernel_sm8450_common_gts8x
           #kernel-dir: msm-4.19
-          kernel-branch: msm-kernel_nethunter
+          kernel-branch: msm-kernel_Nethunter
           config: ${{ inputs.device }}-waipio_defconfig
           arch: arm64
           aosp-gcc: true
