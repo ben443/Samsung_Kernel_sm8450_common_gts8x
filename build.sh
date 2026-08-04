@@ -35,6 +35,7 @@ CLANG_BINARY=${CLANG_BINARY:-${CLANG_DIR}/bin/clang}
 
 KERNEL_NAME=${CI_KERNEL_NAME:-${KERNEL_NAME:-Samsung-Kernel-${DEVICE}}}
 EXTRA_KMAKE_TARGETS=${EXTRA_KMAKE_TARGETS:-"Image dtbs"}
+DTBO_PAGE_SIZE=${DTBO_PAGE_SIZE:-4096}
 
 MAKE_FLAGS=(
   O=${OUT_DIR}
@@ -81,6 +82,28 @@ build_kernel() {
   make "${MAKE_FLAGS[@]}" -j"$(nproc)" ${EXTRA_KMAKE_TARGETS}
 }
 
+build_dtbo_image() {
+  local dtbo_path="${OUT_DIR}/arch/arm64/boot/dtbo.img"
+  local -a dtbo_files=()
+  local mkdtboimg_tool
+
+  while IFS= read -r -d '' dtbo_file; do
+    dtbo_files+=("${dtbo_file}")
+  done < <(find "${OUT_DIR}/arch/arm64/boot/dts" -type f -name "${BUILD_TARGET}_*.dtbo" -print0)
+
+  if [ "${#dtbo_files[@]}" -eq 0 ]; then
+    return
+  fi
+
+  mkdtboimg_tool=$(command -v mkdtboimg.py || command -v mkdtboimg || true)
+  if [ -z "${mkdtboimg_tool}" ]; then
+    echo "Unable to create ${dtbo_path}: mkdtboimg.py not found in PATH" >&2
+    exit 1
+  fi
+
+  "${mkdtboimg_tool}" create "${dtbo_path}" --page_size="${DTBO_PAGE_SIZE}" "${dtbo_files[@]}"
+}
+
 package_anykernel() {
   local image_path="${OUT_DIR}/arch/arm64/boot/Image"
   local dtbo_path="${OUT_DIR}/arch/arm64/boot/dtbo.img"
@@ -118,6 +141,7 @@ main() {
   setup_toolchain
   prepare_anykernel
   build_kernel
+  build_dtbo_image
   package_anykernel
 
   local elapsed=$(( $(date +%s) - BUILD_START ))
