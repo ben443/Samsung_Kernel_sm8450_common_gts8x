@@ -46,6 +46,14 @@ MAKE_FLAGS=(
   LLVM_IAS=1
 )
 
+# NetHunter-friendly defaults: build the kernel only, without KSU/SUKISU/APatch/SUSFS overlays.
+ENABLE_KSU_NEXT=${ENABLE_KSU_NEXT:-0}
+ENABLE_SUKISU=${ENABLE_SUKISU:-0}
+ENABLE_KSU=${ENABLE_KSU:-0}
+ENABLE_APATCH=${ENABLE_APATCH:-0}
+PATCH_SUSFS=${PATCH_SUSFS:-0}
+PATCH_KPM=${PATCH_KPM:-0}
+
 error_handler() {
   local line="$1"
   echo "Build failed at line ${line}" >&2
