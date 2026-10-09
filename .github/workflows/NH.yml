@@ -7,7 +7,7 @@ on:
         description: "Kernel device target"
         required: true
         type: choice
-        default: "gts8uwifi"
+        default: "gts8wifi"
         options:
           - gts8uwifi
           - gts8wifi

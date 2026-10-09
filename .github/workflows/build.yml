@@ -6,7 +6,7 @@ on:
         description: 'Build target device'
         required: true
         type: choice
-        default: 'gts8uwifi'
+        default: 'gts8wifi'
         options:
           - gts8uwifi
           - gts8wifi
